@@ -27,6 +27,7 @@ tf.flags.DEFINE_float("l2_reg_lambda", 0.0, "L2 regularization lambda (default: 
 # Training parameters
 tf.flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
 tf.flags.DEFINE_integer("num_epochs", 200, "Number of training epochs (default: 200)")
+tf.flags.DEFINE_integer("log_train_every", 25, "Log training results after this many steps (default: 25)")
 tf.flags.DEFINE_integer("evaluate_every", 100, "Evaluate model on dev set after this many steps (default: 100)")
 tf.flags.DEFINE_integer("checkpoint_every", 100, "Save model after this many steps (default: 100)")
 tf.flags.DEFINE_integer("num_checkpoints", 5, "Number of checkpoints to store (default: 5)")
@@ -135,7 +136,7 @@ with tf.Graph().as_default():
         # Initialize all variables
         sess.run(tf.global_variables_initializer())
 
-        def train_step(x_batch, y_batch):
+        def train_step(x_batch, y_batch, writer=None):
             """
             A single training step
             """
@@ -149,7 +150,8 @@ with tf.Graph().as_default():
                 feed_dict)
             time_str = datetime.datetime.now().isoformat()
             print("{}: step {}, loss {:g}, acc {:g}".format(time_str, step, loss, accuracy))
-            train_summary_writer.add_summary(summaries, step)
+            if writer:
+                writer.add_summary(summaries, step)
 
         def dev_step(x_batch, y_batch, writer=None):
             """
@@ -174,8 +176,11 @@ with tf.Graph().as_default():
         # Training loop. For each batch...
         for batch in batches:
             x_batch, y_batch = zip(*batch)
-            train_step(x_batch, y_batch)
             current_step = tf.train.global_step(sess, global_step)
+            if current_step % FLAGS.log_train_every == 0:
+                train_step(x_batch, y_batch, writer=train_summary_writer)
+            else: 
+                train_step(x_batch, y_batch)
             if current_step % FLAGS.evaluate_every == 0:
                 print("\nEvaluation:")
                 dev_step(x_dev, y_dev, writer=dev_summary_writer)
